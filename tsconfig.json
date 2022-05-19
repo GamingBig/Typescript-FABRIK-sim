@@ -1,0 +1,16 @@
+{
+	"compilerOptions": {
+		"module": "commonjs",
+		"lib": ["DOM", "ESNext"],
+		"outDir": "out"
+	},
+	"exclude": ["node_modules"],
+	"compileOnSave": true,
+	"watchOptions": {
+		"watchFile": "useFsEvents",
+		"watchDirectory": "useFsEvents",
+		"fallbackPolling": "dynamicPriority",
+		"synchronousWatchDirectory": true,
+		"excludeDirectories": ["**/node_modules"]
+	}
+}
