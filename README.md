@@ -13,4 +13,4 @@ If you want a proper simulation, use <a href="https://brm.io/matter-js/">Matter.
 - Understanding of Javascript
 
 ## Demo:
-![Demo](https://github.com/GamingBig/Typescript-FABRIK-sim/blob/main/demo/Fabrik_sim.mp4?raw=true)
+https://user-images.githubusercontent.com/44531907/169244394-d6cc99f7-d4c4-45b3-b23c-15b547b15c74.mp4
