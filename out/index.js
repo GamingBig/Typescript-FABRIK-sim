@@ -10,38 +10,42 @@ var points = [];
 var temp = [];
 //? Settings
 var maxIterations = 10;
-var minAcceptableDist = 0.01;
-var numPoints = 1000;
+var numPoints = 100;
+var distanceBtwnPoints = 100;
 var canvas = document.querySelector("#render");
 var ctx = canvas.getContext("2d");
+var pointSlider = document.querySelector("#numPoints");
 var frameTime = Date.now();
 var baseFPS = 60;
 var frameList = [];
-var prevFPS = "0";
+var prevFPS = "60";
 init();
 function init() {
     canvas.width = document.body.clientWidth;
     canvas.height = document.body.clientHeight;
     ctx.imageSmoothingEnabled = true;
-    ctx.translate(0.5, 0.5);
-    var virtIX = 0;
-    var virtIY = 0;
-    var loopI;
+    var loop = 10;
+    var curX = 0;
+    var reverse = false;
     for (var i = 0; i < numPoints; i++) {
-        virtIX++;
-        if (100 * virtIX + 100 > canvas.width / 2) {
-            if (!loopI) {
-                loopI = i;
+        for (var j = 0; j < numPoints; j++) {
+            if (curX / 100 == loop) {
+                reverse = true;
             }
-            virtIX %= loopI;
-            virtIY++;
-            if (virtIY > loopI) {
-                virtIY = 0;
+            else if (curX == 0) {
+                reverse = false;
+            }
+            if (reverse) {
+                curX--;
+            }
+            else {
+                curX++;
             }
         }
+        console.log(curX / 100, reverse);
         var curPoint = {
-            posX: (virtIY % loopI ? loopI - (virtIX + 1) : virtIX + 1) * 100 + (canvas.width / 2 - 100),
-            posY: 100 * (virtIY + 1),
+            posX: curX + 100 + (canvas.width / 2 - loop * 65),
+            posY: Math.sinh(i / 100) * 100 - 100 * i,
             radius: 20,
             prevX: 0,
             prevY: 0,
@@ -67,15 +71,22 @@ function init() {
     render();
 }
 var size;
+function pointSliderUpdates() {
+    numPoints = pointSlider.value;
+    AddPoints();
+}
 function render() {
     canvas.width = document.body.clientWidth;
     canvas.height = document.body.clientHeight;
     var sizeSlider = document.querySelector("#size");
+    var distanceSlider = document.querySelector("#distance");
     size = sizeSlider.value / 20;
+    distanceBtwnPoints = distanceSlider.value;
+    pointSlider.value = numPoints;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawFPS(ctx);
     solvePoints();
     drawPoints(points, ctx, canvas);
-    drawFPS(ctx);
     requestAnimationFrame(render);
 }
 var deltaTime;
@@ -89,7 +100,7 @@ function drawFPS(ctx) {
     deltaTime = (Date.now() - frameTime) / (1000 / baseFPS);
     frameTime = Date.now();
     frameList.push(baseFPS / deltaTime);
-    if (frameList.length >= 10) {
+    if (frameList.length >= 100) {
         var sum = frameList.reduce(function (a, b) { return a + b; }, 0);
         sum /= frameList.length;
         frameList = [];
@@ -106,8 +117,8 @@ function drawPoints(points, ctx, canvas) {
     for (var j = 0; j < points.length; j++) {
         var curJindex = Math.floor(Math.random() * jLeft.length);
         var curJ = jLeft[curJindex];
-        var point = points[curJ];
-        jLeft.splice(curJindex, 1);
+        var point = points[j];
+        jLeft.splice(j, 1);
         point.radius = 20 * size;
         if (point.posX == NaN) {
             points.splice(point.index, 1);
@@ -162,7 +173,7 @@ var createIndex;
 canvas.onmousedown = function (ev) {
     var curX = ev.clientX;
     var curY = ev.clientY;
-    if (ev.buttons == 1 && !ev.shiftKey) {
+    if (ev.buttons == 1 && !ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
         var closestPoint;
         var closestDist = Infinity;
         points.forEach(function (point) {
@@ -173,12 +184,12 @@ canvas.onmousedown = function (ev) {
             }
             point.selected = false;
         });
-        if (closestPoint && !closestPoint.locked) {
+        if (closestPoint) {
             closestPoint.selected = true;
         }
     }
     // Connect points
-    if (ev.buttons == 1 && ev.shiftKey) {
+    if (ev.buttons == 1 && ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
         var closestPoint;
         var closestDist = Infinity;
         points.forEach(function (point) {
@@ -211,7 +222,7 @@ canvas.onmousedown = function (ev) {
         }
     }
     //? Create point
-    if (ev.buttons == 1 && !ev.shiftKey && ev.ctrlKey) {
+    if (ev.buttons == 1 && !ev.shiftKey && ev.ctrlKey && !ev.altKey) {
         var closestPoint;
         var closestDist = Infinity;
         points.forEach(function (point) {
@@ -244,20 +255,58 @@ canvas.onmousedown = function (ev) {
             points.push(newPoint);
             selectedPoint.siblings.push(newPoint);
             newPoint.siblings.push(selectedPoint);
+            numPoints++;
+            updatePoint(newPoint, curX, curY);
+            newPoint.locked = true;
             createIndex = undefined;
             // debugger
         }
     }
+    //? Delete point
+    if (ev.buttons == 1 && !ev.shiftKey && !ev.ctrlKey && ev.altKey) {
+        var closestPoint;
+        var closestDist = Infinity;
+        points.forEach(function (point) {
+            var dist = dstToCoord(point.posX, point.posY, curX, curY);
+            if (dist < closestDist && dist < point.radius) {
+                closestDist = dist;
+                closestPoint = point;
+            }
+        });
+        if (!closestPoint) {
+            return;
+        }
+        var sibling1 = closestPoint.siblings[0];
+        sibling1.siblings.splice(sibling1.siblings.findIndex(function (point) { return point.index == closestPoint.index; }), 1);
+        for (var i = 1; i < closestPoint.siblings.length; i++) {
+            var sibling = closestPoint.siblings[i];
+            sibling.siblings.splice(sibling.siblings.findIndex(function (point) { return point.index == closestPoint.index; }), 1);
+            sibling.siblings.push(sibling1);
+            sibling1.siblings.push(sibling);
+        }
+        numPoints -= 1;
+        points.splice(closestPoint.index, 1);
+        points.forEach(function (point, i) {
+            point.index = i;
+        });
+    }
 };
 canvas.onmousemove = function (ev) {
+    ev.preventDefault();
     var curX = ev.clientX;
     var curY = ev.clientY;
     mouseX = curX;
     mouseY = curY;
-    if (ev.buttons == 1 && !ev.shiftKey) {
+    if (ev.buttons == 1 && !ev.shiftKey && !ev.ctrlKey) {
         points.forEach(function (point) {
-            if (point.selected) {
+            if (point.selected && !point.locked) {
                 updatePoint(point, curX, curY);
+            }
+            if (point.locked && point.selected) {
+                point.prevX = point.posX;
+                point.prevY = point.posY;
+                point.posX = curX;
+                point.posY = curY;
             }
         });
     }
@@ -363,7 +412,7 @@ function interpolate(x1, y1, x2, y2, frac) {
     return [nx, ny];
 }
 function solvePoints() {
-    for (var i = 0; i < 20; i++) {
+    for (var i = 0; i < 10; i++) {
         var _loop_1 = function (i_1) {
             var point = points[i_1];
             point.siblings.forEach(function (sibling) {
@@ -374,28 +423,32 @@ function solvePoints() {
                 var dx = point.posX - sibling.posX;
                 var dy = point.posY - sibling.posY;
                 var distance = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
-                var difference = 100 * size - distance;
+                var difference = distanceBtwnPoints * size - distance;
                 var percent = difference / distance / 2;
                 var offsetX = !point.locked ? dx * percent : 0;
                 var offsetY = !point.locked ? dy * percent : 0;
                 var origX = point.prevX;
                 var origY = point.prevY;
-                sibling.posX -= offsetX;
-                sibling.posY -= offsetY;
-                point.posX += offsetX;
-                point.posY += offsetY;
+                if (!sibling.locked) {
+                    sibling.posX -= offsetX;
+                    sibling.posY -= offsetY;
+                }
+                if (!point.locked) {
+                    point.posX += offsetX;
+                    point.posY += offsetY;
+                }
                 if (point.selected) {
                     point.posX = mouseX;
                     point.posY = mouseY;
                 }
-                if (point.locked) {
+                if (point.locked && !point.selected) {
                     point.posX = origX;
                     point.posY = origY;
                 }
                 clampToSides(point, true, true);
                 point.prevY = point.posY;
                 point.prevX = point.posX;
-                sibling.posY = Math.max(sibling.posY, point.posY - 100);
+                sibling.posY = Math.max(sibling.posY, point.posY - distanceBtwnPoints);
             });
         };
         for (var i_1 = 0; i_1 < points.length - 1; i_1++) {
@@ -421,5 +474,30 @@ function clampToSides(point, x, y) {
     }
     if (y) {
         point.posY = Math.min(canvas.height - point.radius, point.posY);
+    }
+}
+function AddPoints() {
+    var offset = 0;
+    console.log(numPoints, points.length);
+    if (points.length > numPoints) {
+        offset = 1;
+        points.pop();
+        points[points.length - 1].siblings.pop();
+    }
+    else {
+        var newPoint = {
+            posX: canvas.width / 2,
+            posY: canvas.height / 2,
+            radius: points[0].radius,
+            prevX: canvas.width / 2,
+            prevY: canvas.height / 2,
+            inertiaX: 0,
+            inertiaY: 0,
+            locked: false,
+            index: points.length + 1,
+            siblings: [points[points.length - 1]]
+        };
+        points[points.length - 1].siblings.push(newPoint);
+        points.push(newPoint);
     }
 }
